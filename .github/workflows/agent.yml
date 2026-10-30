@@ -1,0 +1,49 @@
+name: Autonomous Dev Engine (Issue to Code)
+
+on:
+  issues:
+    types: [opened, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue Number'
+        required: true
+        default: '2'
+
+jobs:
+  solve-issue:
+    # Runs on any newly opened issue, or if manually labeled 'agent'
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Google GenAI SDK
+        run: pip install google-genai
+
+      - name: Execute Manager & Developer Agents
+        env:
+          PYTHONUNBUFFERED: "1"
+          GIT_TERMINAL_PROMPT: "0"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          ISSUE_TITLE: ${{ github.event.issue.title || 'Manual Trigger' }}
+          ISSUE_BODY: ${{ github.event.issue.body || '' }}
+          REPO: ${{ github.repository }}
+        run: python .github/scripts/agent.py

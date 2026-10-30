@@ -1,0 +1,106 @@
+name: Universal Build, Preview & Release Pipeline
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Environment (Python, Node, Rust, Go)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Rust (if Cargo.toml exists)
+        if: hashFiles('Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Go (if go.mod exists)
+        if: hashFiles('go.mod') != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Set up Java / Android SDK (if Android/Gradle project)
+        if: hashFiles('build.gradle', 'build.gradle.kts', 'app/build.gradle') != ''
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Execute Project Build Script
+        run: |
+          mkdir -p dist
+          if [ -f "./build.sh" ]; then
+            chmod +x ./build.sh
+            ./build.sh
+          fi
+
+      # -------------------------------------------------------------
+      # 1. LIVE WEB PREVIEW (GitHub Pages)
+      # Deploys if static web files exist in root or dist/
+      # -------------------------------------------------------------
+      - name: Prepare GitHub Pages directory
+        id: pages_check
+        run: |
+          if [ -f "dist/index.html" ]; then
+            echo "DEPLOY_DIR=dist" >> $GITHUB_OUTPUT
+            echo "HAS_PAGES=true" >> $GITHUB_OUTPUT
+          elif [ -f "index.html" ]; then
+            echo "DEPLOY_DIR=." >> $GITHUB_OUTPUT
+            echo "HAS_PAGES=true" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_PAGES=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup GitHub Pages
+        if: steps.pages_check.outputs.HAS_PAGES == 'true'
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages Artifact
+        if: steps.pages_check.outputs.HAS_PAGES == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.pages_check.outputs.DEPLOY_DIR }}
+
+      - name: Deploy Live Web Preview to GitHub Pages
+        if: steps.pages_check.outputs.HAS_PAGES == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # -------------------------------------------------------------
+      # 2. BINARY / APK RELEASE (GitHub Releases)
+      # Publishes downloadable binaries or APKs found in dist/
+      # -------------------------------------------------------------
+      - name: Publish Release Assets (APKs, Binaries, Bundles)
+        run: |
+          # Check if any files exist in dist
+          FILE_COUNT=$(find dist -maxdepth 1 -type f 2>/dev/null | wc -l)
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            TAG="v$(date +'%Y.%m.%d-%H%M%S')"
+            echo "Publishing release $TAG with compiled assets..."
+            gh release create "$TAG" dist/* \
+              --title "Automated Build $TAG" \
+              --notes "Automated build artifacts (APK/binaries) compiled from main branch."
+          else
+            echo "No compiled binary artifacts found in dist/. Skipping GitHub Release."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

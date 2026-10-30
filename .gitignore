@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Environment variables
+.env
+
+# Build outputs
+dist/
+build/
+*.apk
+*.aab
+*.tar.gz
+*.zip
+
+# OS artifacts
+.DS_Store
+Thumbs.db
