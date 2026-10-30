@@ -24,7 +24,7 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     var screenHeight: Float = 1080f
 
     // Game entities
-    lateinit var player: Player
+    var player: Player = Player(screenWidth / 2f, screenHeight / 2f)
     private val enemies = ArrayList<Enemy>()
     private val bullets = ArrayList<Bullet>()
     private val pickups = ArrayList<Pickup>()
@@ -99,25 +99,37 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        screenWidth = width.toFloat()
-        screenHeight = height.toFloat()
+        if (width > 0 && height > 0) {
+            screenWidth = width.toFloat()
+            screenHeight = height.toFloat()
+        }
         initGame()
 
+        pause() // Ensure no leftover loop is running
         gameLoop = GameLoop(this, holder)
         gameLoop?.startLoop()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
-        screenWidth = w.toFloat()
-        screenHeight = h.toFloat()
+        if (w > 0 && h > 0) {
+            screenWidth = w.toFloat()
+            screenHeight = h.toFloat()
+            if (player.position.x == 0f && player.position.y == 0f) {
+                player.position.set(screenWidth / 2f, screenHeight / 2f)
+            }
+        }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        var retry = true
+        pause()
+    }
+
+    fun pause() {
         gameLoop?.stopLoop()
+        var retry = true
         while (retry) {
             try {
-                gameLoop?.join()
+                gameLoop?.join(300)
                 retry = false
             } catch (_: InterruptedException) {}
         }
@@ -380,7 +392,9 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         canvas.drawColor(Color.rgb(8, 8, 16))
 
         // Apply camera shake if any
-        if (particleSystem.screenShakeAmount > 0.01f) {
+        val hasShake = particleSystem.screenShakeAmount > 0.01f
+        if (hasShake) {
+            canvas.save()
             val shakeX = (random.nextFloat() * 2f - 1f) * particleSystem.screenShakeAmount
             val shakeY = (random.nextFloat() * 2f - 1f) * particleSystem.screenShakeAmount
             canvas.translate(shakeX, shakeY)
@@ -412,6 +426,10 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
         // Render Player
         if (!isGameOver) {
             player.render(canvas, hudPaint)
+        }
+
+        if (hasShake) {
+            canvas.restore()
         }
 
         // Render Floating Joystick Controls

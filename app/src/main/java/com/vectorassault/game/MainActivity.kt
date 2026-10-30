@@ -25,6 +25,18 @@ class MainActivity : AppCompatActivity() {
         hideSystemUI()
     }
 
+    override fun onPause() {
+        super.onPause()
+        gameView?.pause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            hideSystemUI()
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         gameView?.soundManager?.release()

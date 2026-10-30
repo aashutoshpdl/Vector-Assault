@@ -12,8 +12,11 @@ class GameLoop(
     private var isRunning = false
 
     fun startLoop() {
+        if (isRunning) return
         isRunning = true
-        start()
+        try {
+            start()
+        } catch (_: IllegalThreadStateException) {}
     }
 
     fun stopLoop() {
@@ -36,26 +39,37 @@ class GameLoop(
 
             // Fixed timestep physics update
             while (accumulator >= targetTimeStep) {
-                gameView.updatePhysics(targetTimeStep.toFloat())
+                try {
+                    gameView.updatePhysics(targetTimeStep.toFloat())
+                } catch (_: Throwable) {}
                 accumulator -= targetTimeStep
             }
 
-            // Render phase
+            // Verify surface is valid before attempting any canvas operations
+            if (!surfaceHolder.surface.isValid) {
+                try {
+                    sleep(10)
+                } catch (_: InterruptedException) {}
+                continue
+            }
+
+            // Render phase using standard, rock-solid SurfaceView lockCanvas
+            // (Avoids lockHardwareCanvas which triggers native SIGSEGV in Mali GPU drivers on Samsung devices)
             var canvas: Canvas? = null
             try {
-                canvas = surfaceHolder.lockHardwareCanvas()
+                canvas = surfaceHolder.lockCanvas()
                 if (canvas != null) {
                     synchronized(surfaceHolder) {
                         gameView.renderFrame(canvas)
                     }
                 }
-            } catch (_: Exception) {
-                // Lock may fail if surface is destroyed
+            } catch (_: Throwable) {
+                // Prevent unhandled exceptions from terminating the thread
             } finally {
                 if (canvas != null) {
                     try {
                         surfaceHolder.unlockCanvasAndPost(canvas)
-                    } catch (_: Exception) {}
+                    } catch (_: Throwable) {}
                 }
             }
         }
