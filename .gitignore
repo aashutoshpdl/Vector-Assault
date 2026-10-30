@@ -12,6 +12,8 @@ ENV/
 # Build outputs
 dist/
 build/
+.gradle/
+local.properties
 *.apk
 *.aab
 *.tar.gz

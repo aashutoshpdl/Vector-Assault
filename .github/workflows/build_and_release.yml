@@ -38,12 +38,18 @@ jobs:
         with:
           go-version: 'stable'
 
-      - name: Set up Java / Android SDK (if Android/Gradle project)
+      - name: Set up Java (if Android/Gradle project)
         if: hashFiles('build.gradle', 'build.gradle.kts', 'app/build.gradle') != ''
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Set up Gradle (lock to 8.5 for AGP compatibility)
+        if: hashFiles('build.gradle', 'build.gradle.kts', 'app/build.gradle') != ''
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
 
       - name: Execute Project Build Script
         run: |
